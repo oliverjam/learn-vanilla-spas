@@ -23,11 +23,12 @@ Our app needs a way for users to sign up and log in. Let's do signing up first. 
 
 ```js
 // app.js
-import router from "./router.js";
+//...
 import signUp from "./routes/sign-up.js";
 
 const app = router();
 
+//...
 app.get("/sign-up", signUp);
 ```
 
@@ -100,6 +101,7 @@ function signUp() {
       body: JSON.stringify(formObject),
       headers: { "content-type": "application/json" },
     })
+      .then((res) => res.json())
       .then((json) => {
         console.log(json);
       })
@@ -114,7 +116,7 @@ function signUp() {
 
 ### Keeping the user logged in
 
-If your request was success you should see a response like this logged:
+If your request was successful you should see an access token in the response object:
 
 ```json
 { "access_token": "eyJhbGci..." }
@@ -129,19 +131,16 @@ Use `localStorage.setItem` to store the token you receive from the API.
 
 ```js
 // ...
-fetch("https://fac-dogs.herokuapp.com/v1/users", {
-  method: "POST",
-  body: JSON.stringify(formObject),
-}).then((json) => {
-  localStorage.setItem("token", json.access_token);
-});
+  .then((json) => {
+    localStorage.setItem("token", json.access_token);
+  });
 ```
 
 </details>
 
 ### Redirecting the user
 
-Once the user has logged in it would be nice to send them to another page on success. We could manually set `window.location` to do this, but that would be bypassing our nice client-side router, causing a full page reload.
+Once the user has logged in it would be nice to send them to another page. We could manually set `window.location` to do this, but that would be bypassing our nice client-side router, causing a full page reload.
 
 Luckily our router exposes a `redirect` method to all the routes, kind of like Express. The route callbacks receive a single object argument, containing useful properties like this. You can use destructuring to access them like this:
 
@@ -177,16 +176,6 @@ We should let the user know if something went wrong with their request, so they 
 ```js
 //...
 const html = /*html*/ `
-<h1>Create an account</h1>
-<form>
-  <label for="name">Name</label>
-  <input type="text" id="name" name="name">
-
-  <label for="email">Email</label>
-  <input type="email" id="email" name="email">
-
-  <label for="password">Password</label>
-  <input type="password" id="password" name="password">
 
   <div id="message"></div>
 
@@ -206,6 +195,9 @@ const html = /*html*/ `
 ### Logging in
 
 Now repeat this process for the `/log-in` route. The only difference is you don't need an input for the user's name, and you should submit the POST request to this endpoint: `https://fac-dogs.herokuapp.com/v1/users/login`.
+
+<details>
+<summary>Solution</summary>
 
 ```js
 // log-in.js
@@ -300,26 +292,24 @@ Also if we try to parse a response that isn't JSON with `res.json()` it'll throw
 Our `fetch` requests should really all look like this:
 
 ```js
-fetch("blah")
-  .then((res) => {
-    if (!res.ok) {
-      const error = new Error("HTTP Error");
-      error.status = res.status;
-      throw error;
-    }
-    const contentType = res.headers.get("content-type");
-    if (contentType && contentType.includes("json")) {
-      return res.json();
-    } else {
-      return res.text();
-    }
-  })
-  .then((json) => console.log(json));
+fetch("blah").then((res) => {
+  if (!res.ok) {
+    const error = new Error("HTTP Error");
+    error.status = res.status;
+    throw error;
+  }
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("json")) {
+    return res.json();
+  } else {
+    return res.text();
+  }
+});
 ```
 
 This is a lot of boilerplate to repeat every time we make a request, so lets make a little utility function that handles this for us. Create a new file named `query.js` containing an exported function named `query`.
 
-This `query` function should take the [same arguments as `fetch`](https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch#Parameters). It should call `fetch` with those arguments and return the promise that `fetch` returns. Add a `.then` to the `fetch` to do all the error-handling from above.
+This `query` function should take the [same two arguments as `fetch`](https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch#Parameters). It should call `fetch` with those arguments and return the promise that `fetch` returns. Add a `.then` to the `fetch` to do all the error-handling from above.
 
 <details>
 <summary>Solution</summary>
@@ -346,7 +336,7 @@ export default query;
 
 </details>
 
-Now we can use import and use `query` whenever we need to make a request, and it'll handle some of the annoying stuff for us. Go back and refactor your `signUp` and `logIn` handlers to use `query`.
+Now we can import and use `query` whenever we need to make a request, and it'll handle some of the annoying stuff for us. Go back and refactor your `signUp` and `logIn` handlers to use `query`.
 
 ### Getting dog data
 
@@ -355,6 +345,8 @@ We can log in, but our app currently doesn't fetch and render any data from the 
 Then use `query` to send a request to `"https://fac-dogs.herokuapp.com/v1/dogs"`. When you get a successful response render an `li` for each dog into the `ul` already on the page.
 
 Each `li` should contain the dog's name and breed.
+
+If something goes wrong we should tell the user, so again add an empty div to the page. When the request fails put a message inside the div.
 
 <details>
 <summary>Solution</summary>
@@ -400,26 +392,11 @@ export default allDogsRoute;
 
 </details>
 
-If something goes wrong we should tell the user, so again add an empty div to the page. When the request fails put a message inside the div.
-
-<details>
-<summary>Solution</summary>
-
-```js
-// ...
-  .catch(error => {
-    console.error(error);
-      app.querySelector("#message").append("Loading dogs failed");
-  })
-```
-
-</details>
-
 ## Creating new dogs
 
 We should provide a form for the user to submit a new dog. This request will have to be authenticated with the token. Create a new route and handler for `/new-dog`.
 
-Since the user must be logged in for this check if there's a token in localStorage. If there isn't render a message asking the user to log in (with a link to the right page). Otherwise the handler should render a form containing fields for the new dog's name and breed.
+The user must be logged in to create a dog, so check if there's a token in localStorage. If there isn't render a message asking the user to log in (with a link to the right page). Otherwise the handler should render a form containing fields for the new dog's name and breed.
 
 When this form is submitted send a `POST` request to `"https://fac-dogs.herokuapp.com/v1/dogs/"`. The POST body should be a JSON object containing the name and breed.
 
@@ -517,7 +494,7 @@ Edit your `signUp` and `logIn` handlers to store an extra property in localStora
 
 Next edit the `allDogs` handler to grab this ID from localStorage. We can use this to conditionally render delete buttons next to each dog that has a matching `owner` property.
 
-Add an event listener to each dog's delete button that sends a `DELETE` request to `"https://fac-dogs.herokuapp.com/v1/dogs/:id"` (where `:id` is the ID of the dog that button relates to). Don't forget you'll need to send an `authorization` header with the token from localStorage.
+Add an event listener to each delete button that sends a `DELETE` request to `"https://fac-dogs.herokuapp.com/v1/dogs/:id"` (where `:id` is the ID of the dog that button relates to). Don't forget you'll need to send an `authorization` header with the token from localStorage.
 
 If the delete request is successful remove that dog `li` from the page. If it fails put an error message in the message div.
 
