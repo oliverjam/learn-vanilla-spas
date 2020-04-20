@@ -1,6 +1,6 @@
 # Learn vanilla single-page apps
 
-Learn how to build a basic single-page app using an external JSON API with token-based authentication.
+Learn how to build a single-page app using an external JSON API with token-based authentication.
 
 ## Setup
 
