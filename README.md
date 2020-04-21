@@ -362,7 +362,7 @@ const html = /*html*/ `
   <ul></ul>
 `;
 
-function createDogElement(dog, token, userId) {
+function createDogElement(dog) {
   const li = document.createElement("li");
   const h2 = document.createElement("h2");
   h2.append(dog.name);
